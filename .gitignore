@@ -1,0 +1,42 @@
+# Python virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python byte-code and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment secrets and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+.streamlit/secrets.toml
+
+# Media uploads and storage artifacts
+media/images/*
+!media/images/.gitkeep
+media/videos/*
+!media/videos/.gitkeep
+media/thumbnails/*
+!media/thumbnails/.gitkeep
+
+# Logs and runtime traces
+*.log
+logs/
+
+# IDE and OS configurations
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

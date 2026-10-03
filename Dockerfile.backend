@@ -1,0 +1,49 @@
+# ============================================================
+# VETRA Backend Service — Production Dockerfile
+# Multi-stage/Hardened Non-Root Container Image
+# ============================================================
+
+FROM python:3.11-slim
+
+# Prevent Python from writing .pyc files and buffer stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH="/app/backend:/app"
+
+# Install system dependencies (curl for healthcheck, libgl for headless CV)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create dedicated non-root application user
+RUN useradd -m -u 1000 -s /bin/bash vetra
+
+WORKDIR /app
+
+# Install Python requirements
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy backend application source
+COPY backend /app/backend
+COPY ai_engine /app/ai_engine
+COPY simulator /app/simulator
+COPY database /app/database
+
+# Prepare media and logging directories with appropriate permissions
+RUN mkdir -p /app/media/images /app/media/videos /app/media/thumbnails /app/logs && \
+    chown -R vetra:vetra /app
+
+USER vetra
+
+# Health check against production liveness probe
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+EXPOSE 8000
+
+# Run Uvicorn in production mode (no auto-reload)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
