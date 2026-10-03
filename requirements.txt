@@ -5,6 +5,7 @@ pymongo
 python-dotenv
 pydantic
 pydantic-settings
+email-validator
 requests
 httpx
 websockets
