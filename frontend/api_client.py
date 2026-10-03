@@ -5,7 +5,39 @@ import requests
 from session import get_token
 
 
-BASE_URL = os.environ.get("VETRA_API_URL", "http://127.0.0.1:8000")
+def _resolve_base_url() -> str:
+    """
+    Resolve the backend API base URL with production-safe fallbacks:
+    1. VETRA_API_URL environment variable (Render / Docker / Cloud)
+    2. BACKEND_URL / API_URL environment variables
+    3. Streamlit secrets (if running in Streamlit Cloud / Render with secrets)
+    4. Default local development URL (http://127.0.0.1:8000)
+    Ensures whitespace and trailing slashes are cleanly stripped.
+    """
+    env_url = (
+        os.environ.get("VETRA_API_URL")
+        or os.environ.get("BACKEND_URL")
+        or os.environ.get("API_URL")
+    )
+    if env_url and env_url.strip():
+        return env_url.strip().rstrip("/")
+
+    try:
+        import streamlit as st
+        secret_url = (
+            st.secrets.get("VETRA_API_URL")
+            or st.secrets.get("BACKEND_URL")
+            or st.secrets.get("API_URL")
+        )
+        if secret_url and str(secret_url).strip():
+            return str(secret_url).strip().rstrip("/")
+    except Exception:
+        pass
+
+    return "http://127.0.0.1:8000"
+
+
+BASE_URL = _resolve_base_url()
 REQUEST_TIMEOUT = 10
 
 
@@ -89,7 +121,19 @@ def get_websocket_status() -> str:
 
     try:
         from websockets.sync.client import connect
-        ws_url = BASE_URL.replace("http://", "ws://").replace("https://", "wss://") + "/ws/monitoring"
+
+        ws_base = os.environ.get("VETRA_WS_URL")
+        if ws_base and ws_base.strip():
+            ws_url = ws_base.strip().rstrip("/") + "/ws/monitoring"
+        elif BASE_URL.startswith("https://"):
+            ws_url = "wss://" + BASE_URL[len("https://"):] + "/ws/monitoring"
+        elif BASE_URL.startswith("http://"):
+            ws_url = "ws://" + BASE_URL[len("http://"):] + "/ws/monitoring"
+        elif BASE_URL.startswith("wss://") or BASE_URL.startswith("ws://"):
+            ws_url = BASE_URL + "/ws/monitoring"
+        else:
+            ws_url = f"ws://{BASE_URL}/ws/monitoring"
+
         with connect(ws_url, open_timeout=0.8, close_timeout=0.5) as websocket:
             websocket.send("ping")
             response = websocket.recv(timeout=0.8)
